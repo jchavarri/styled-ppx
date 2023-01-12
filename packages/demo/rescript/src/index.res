@@ -35,11 +35,9 @@ module Link = %styled.a(`
     font-size: 44px;
   }
 `)
-module Line = %styled.span("display: inline;")
 
-module Wrapper = %styled.div(`
-  display: grid;
-`)
+module Line = %styled.span("display: inline;")
+module Wrapper = %styled.div("display: inline;")
 
 module Dynamic = %styled.input((~a as _) => "display: inline;")
 
@@ -53,16 +51,13 @@ switch ReactDOM.querySelector("#app") {
 | Some(el) =>
   ReactDOM.render(
     <App onClick=Js.log>
-      <Wrapper>
-        <Line />
-        <div className />
-        <Dynamic a="23" />
-        <Component> {React.string("test..")} </Component>
-        <App2> <Component> {React.string("Demo of...")} </Component> </App2>
-        <Link href="https://github.com/davesnx/styled-ppx"> {React.string("styled-ppx")} </Link>
-        <Link href="https://github.com/davesnx/styled-ppx"> {React.string("styled-ppx")} </Link>
-        <Link href="https://github.com/davesnx/styled-ppx"> {React.string("styled-ppx")} </Link>
-      </Wrapper>
+      <div className />
+      <Dynamic a="23" />
+      <Component> {React.string("test..")} </Component>
+      <App2> <Component> {React.string("Demo of...")} </Component> </App2>
+      <Link href="https://github.com/davesnx/styled-ppx"> {React.string("styled-ppx")} </Link>
+      <Link href="https://github.com/davesnx/styled-ppx"> {React.string("styled-ppx")} </Link>
+      <Link href="https://github.com/davesnx/styled-ppx"> {React.string("styled-ppx")} </Link>
     </App>,
     el,
   )

@@ -4,10 +4,10 @@
  (libraries styled-ppx.lib ppxlib))
 
 (rule
- (targets snapshot.actual.re)
+ (targets test.actual.re)
  (deps
-  (:runner runner.exe)
-  (:input snapshot.re))
+  (:pp pp.exe)
+  (:input test.re))
  (action
   (progn
    (with-stdout-to
@@ -19,7 +19,7 @@
 (rule
  (alias ppx_snapshot_test)
  (deps
-  (file snapshot.expected.re)
-  (file snapshot.actual.re))
+  (file test.expected.re)
+  (file test.actual.re))
  (action
-  (diff snapshot.expected.re snapshot.actual.re)))
+  (diff test.expected.re test.actual.re)))
