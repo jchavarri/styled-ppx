@@ -18,6 +18,7 @@ let id = Fun.id;
 type transform('ast, 'value) = {
   ast_of_string: string => result('ast, string),
   value_of_ast: (~loc: Location.t, 'ast) => 'value,
+  value_to_expr: (~loc: Location.t, 'value) => list(Parsetree.expression),
   ast_to_expr: (~loc: Location.t, 'ast) => list(Parsetree.expression),
   string_to_expr: (~loc: Location.t, string) => result(list(Parsetree.expression), string),
 };
@@ -34,7 +35,7 @@ let emit = (property, value_of_ast, value_to_expr) => {
   let string_to_expr = (~loc, string) =>
     ast_of_string(string) |> Result.map(ast_to_expr(~loc));
 
-  {ast_of_string, value_of_ast, ast_to_expr, string_to_expr};
+  {ast_of_string, value_of_ast, value_to_expr, ast_to_expr, string_to_expr};
 };
 
 let emit_shorthand = (parser, mapper, value_to_expr) => {
@@ -47,6 +48,7 @@ let emit_shorthand = (parser, mapper, value_to_expr) => {
   {
     ast_of_string,
     value_of_ast,
+    value_to_expr,
     ast_to_expr,
     string_to_expr,
   };
@@ -960,11 +962,11 @@ let render_background_position = (~loc, position) => {
     };
 
   switch (position) {
-    | `Center => variants_to_expression(~loc, `Center)
-    | `Left => variants_to_expression(~loc, `Left)
-    | `Right => variants_to_expression(~loc, `Right)
-    | `Bottom => variants_to_expression(~loc, `Bottom)
-    | `Top => variants_to_expression(~loc, `Top)
+    | `Bottom => [%expr `bottom]
+    | `Center => [%expr `center]
+    | `Top => [%expr `top]
+    | `Left => [%expr `left]
+    | `Right => [%expr `right]
     | `Extended_length(l) => render_extended_length(~loc, l)
     | `Extended_percentage(a) => render_extended_percentage(~loc, a)
     | `Static((x, y)) => [%expr `hv([%e render_static(x)], [%e render_static(y)])]
@@ -1346,9 +1348,15 @@ let box_shadow =
       },
   );
 
+let render_overflow =
+  (~loc) => fun
+  | `Clip => raise(Unsupported_feature)
+  | rest => variants_to_expression(~loc, rest);
+
 // css-overflow-3
+// TODO: maybe implement using strings?
 let overflow_x =
-  variants(Parser.property_overflow_x, (~loc) => [%expr CssJs.overflowX]);
+  apply(Parser.property_overflow_x, (~loc) => [%expr CssJs.overflowX], render_overflow);
 
 let overflow_y =
   variants(Parser.property_overflow_y, (~loc) => [%expr CssJs.overflowY]);
@@ -1356,13 +1364,12 @@ let overflow_y =
 let overflow =
   emit(
     Parser.property_overflow,
-    (~loc as _) => id,
     (~loc) => fun
-    | `Xor([all]) => [[%expr CssJs.overflow([%e variants_to_expression(~loc, all)])]]
-    | `Xor([x, y]) => [
-      [%expr CssJs.overflowX([%e variants_to_expression(~loc, x)])],
-      [%expr CssJs.overflowY([%e variants_to_expression(~loc, y)])]
-    ]
+    | `Xor(values) => values |> List.map(render_overflow(~loc))
+    | _ => raise(Unsupported_feature),
+    (~loc) => fun
+    | [all] => [[%expr CssJs.overflow([%e all])]]
+    | [_x, _y] => raise(Unsupported_feature)
     | _ => failwith("unreachable"),
   );
 
@@ -1601,51 +1608,24 @@ let transform =
     }
   );
 
-let render_origin = (~loc) => fun
-  | `Center => variants_to_expression(~loc, `Center)
-  | `Left => variants_to_expression(~loc, `Left)
-  | `Right => variants_to_expression(~loc, `Right)
-  | `Bottom => variants_to_expression(~loc, `Bottom)
-  | `Top => variants_to_expression(~loc, `Top)
-  | `Function_calc(fc) => render_function_calc(~loc, fc)
-  | `Interpolation(v) => render_variable(~loc, v)
-  | `Length(l) => render_length(~loc, l)
-  | `Extended_length(l) => render_extended_length(~loc, l)
-  | `Extended_percentage(p) => render_extended_percentage(~loc, p);
-
 let transform_origin =
-  emit(
+  unsupportedValue(
     Parser.property_transform_origin,
-    (~loc as _) => id,
-    (~loc) => fun
-      /* x, y are swapped on purpose */
-      | `Static(((y, x), None)) => {
-        [[%expr CssJs.transformOrigin(
-          [%e render_origin(~loc, x)],
-          [%e render_origin(~loc, y)]
-        )]]
-      }
-      | `Center => [[%expr CssJs.transformOrigin(`Center, `Center)]]
-      | `Left => [[%expr CssJs.transformOrigin(`Left, `Center)]]
-      | `Right => [[%expr CssJs.transformOrigin(`Right, `Center)]]
-      | `Bottom => [[%expr CssJs.transformOrigin(`Bottom, `Center)]]
-      | `Top => [[%expr CssJs.transformOrigin(`Top, `Center)]]
-      | `Static((_, Some(_)))
-      | `Extended_length(_)
-      | `Extended_percentage(_) => raise(Unsupported_feature)
+    (~loc) => [%expr CssJs.transformOrigin],
   );
-let transform_box = unsupportedProperty(Parser.property_transform_box);
+let transform_box =
+  unsupportedValue(
+    Parser.property_transform_box,
+    (~loc) => [%expr CssJs.transformOrigin],
+  );
 let translate =
   unsupportedValue(Parser.property_translate, (~loc) => [%expr CssJs.translate]);
 let rotate = unsupportedValue(Parser.property_rotate, (~loc) => [%expr CssJs.rotate]);
 let scale = unsupportedValue(Parser.property_scale, (~loc) => [%expr CssJs.scale]);
 let transform_style =
-  apply(
+  unsupportedValue(
     Parser.property_transform_style,
     (~loc) => [%expr CssJs.transformStyle],
-    (~loc) => fun
-      | `Flat => variants_to_expression(~loc, `Flat)
-      | `Preserve_3d => variants_to_expression(~loc, `Preserve_3d)
   );
 let perspective = unsupportedProperty(Parser.property_perspective);
 let perspective_origin =
@@ -1661,15 +1641,9 @@ let backface_visibility =
 
 // css-transition-1
 let transition_property =
-  apply(
+  unsupportedValue(
     Parser.property_transition_property,
     (~loc) => [%expr CssJs.transitionProperty],
-    (~loc) => fun
-      | `None => render_string(~loc, "none")
-      | `All => render_string(~loc, "all")
-      | `Custom_ident(v) => render_string(~loc, v)
-      | `Interpolation(v) => render_variable(~loc, v)
-      | `Single_transition_property(_) => raise(Unsupported_feature)
   );
 let transition_duration =
   unsupportedValue(
@@ -1683,13 +1657,9 @@ let transition_timing_function =
     (~loc) => [%expr CssJs.transitionTimingFunction],
   );
 let transition_delay =
-  apply(
+  unsupportedValue(
     Parser.property_transition_delay,
     (~loc) => [%expr CssJs.transitionDelay],
-    (~loc) => fun
-      | [`Time(t)] => render_time(~loc, t)
-      | [`Interpolation(v)] => render_variable(~loc, v)
-      | _ => raise(Unsupported_feature),
   );
 let transition =
   unsupportedValue(Parser.property_transition, (~loc) => [%expr CssJs.transition]);

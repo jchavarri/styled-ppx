@@ -30,6 +30,7 @@ depends: [
   "ocaml-base-compiler" {= "4.14.0"}
   "ocaml-compiler-libs" {= "v0.12.4"}
   "ocaml-config" {= "2"}
+  "ocaml-migrate-parsetree" {= "2.4.0"}
   "ocaml-options-vanilla" {= "1"}
   "ocamlbuild" {= "0.14.1"}
   "ocamlfind" {= "1.9.5"}
